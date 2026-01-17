@@ -75,4 +75,48 @@ The application follows key digital forensic principles:
 ## 🧩 Project Structure
 
 The codebase follows a modular and extensible architecture:
+```
+app/
+├─ ui/ # Main UI
+├─ collectors/ # Artifact-specific collectors
+├─ export/ # Case & file management
+├─ integrity/ # Hashing utilities
+├─ logging/ # Forensic logging
+├─ model/ # Data models
+└─ util/ # Helper utilities
+```
+
+Each forensic artifact is handled by an independent collector module, enabling easy extension.
+
+---
+
+## 🚀 Future Extensions
+
+Potential future enhancements include:
+
+- Browser history extraction
+- Calendar events acquisition
+- Media metadata analysis
+- Network and Wi-Fi artifacts
+- Automated ZIP export of case data
+- Cross-device testing (real devices vs emulator)
+
+---
+
+## ⚠️ Disclaimer
+
+This project is developed **strictly for educational and research purposes**.  
+It is **not intended for use in real investigations** or on devices without proper authorization.
+
+---
+
+## 👤 Author
+
+GitHub: [saragsil](https://github.com/saragsil)
+
+---
+
+## 📜 License
+
+This project is provided for academic use. Licensing can be defined if required.
 
