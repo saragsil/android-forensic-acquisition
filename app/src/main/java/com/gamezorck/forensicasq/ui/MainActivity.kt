@@ -14,6 +14,15 @@ import androidx.compose.ui.unit.dp
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.ui.platform.LocalContext
+import com.gamezorck.forensicasq.collectors.DeviceInfoCollector
+import com.gamezorck.forensicasq.export.AppState
+import com.gamezorck.forensicasq.export.CaseManager
+import com.gamezorck.forensicasq.logging.ForensicLogger
+import com.gamezorck.forensicasq.model.Manifest
+import com.gamezorck.forensicasq.export.ManifestWriter
+import com.gamezorck.forensicasq.integrity.Hashing
+
 
 class MainActivity : ComponentActivity() {
 
@@ -32,6 +41,7 @@ class MainActivity : ComponentActivity() {
 fun ForensicHomeScreen() {
     var status by remember { mutableStateOf("[Init] App started.") }
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
 
     fun log(msg: String) {
         val ts = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
@@ -51,7 +61,11 @@ fun ForensicHomeScreen() {
             )
 
             Button(
-                onClick = { log("Start/Create Case clicked (TODO).") },
+                onClick = {
+                    val dir = CaseManager.createCaseDirectory(context)
+                    AppState.currentCaseDir = dir
+                    log("Case created: ${dir.absolutePath}")
+                },
                 modifier = Modifier.fillMaxWidth()
             ) { Text("Start / Create Case") }
 
@@ -76,9 +90,42 @@ fun ForensicHomeScreen() {
             ) { Text("Collect Installed Apps") }
 
             Button(
-                onClick = { log("Collect Device Info clicked (TODO).") },
+                onClick = {
+                    val caseDir = AppState.currentCaseDir
+                    if (caseDir == null) {
+                        log("ERROR: No active case. Click 'Start / Create Case' first.")
+                        return@Button
+                    }
+
+                    val logger = ForensicLogger(caseDir)
+                    logger.log("Starting DeviceInfo acquisition")
+
+                    val result = DeviceInfoCollector().collect(context, caseDir)
+
+                    if (result.success) {
+                        logger.log("DeviceInfo acquired: ${result.outputFile}")
+
+                        val manifest = Manifest(
+                            caseId = caseDir.parentFile?.name ?: "UNKNOWN",
+                            timestamp = caseDir.name,
+                            device = "Android Emulator",
+                            artifacts = listOf(result)
+                        )
+
+                        ManifestWriter.write(manifest, caseDir)
+                        Hashing.writeHashes(caseDir)
+
+                        logger.log("Manifest and hashes generated")
+                        log("OK: device.json + manifest.json + hashes.sha256 written")
+                    } else {
+                        logger.log("ERROR: ${result.error}")
+                        log("ERROR: DeviceInfoCollector failed")
+                    }
+
+                },
                 modifier = Modifier.fillMaxWidth()
             ) { Text("Collect Device Info") }
+
 
             Spacer(Modifier.height(8.dp))
 
