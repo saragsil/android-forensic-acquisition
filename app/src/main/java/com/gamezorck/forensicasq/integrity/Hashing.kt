@@ -20,11 +20,30 @@ object Hashing {
 
     fun writeHashes(caseDir: File) {
         val out = File(caseDir, "hashes.sha256")
-        caseDir.listFiles()?.forEach { f ->
-            if (f.isFile && f.name != out.name) {
+
+        val lines = StringBuilder()
+        caseDir.listFiles()
+            ?.filter { it.isFile && it.name != out.name }
+            ?.sortedBy { it.name }
+            ?.forEach { f ->
                 val hash = sha256(f)
-                out.appendText("$hash  ${f.name}\n")
+                lines.append("$hash  ${f.name}\n")
             }
-        }
+
+        out.writeText(lines.toString())
+    }
+
+    /** Writes "<sha256>  <filename>" to the given output file (overwrites). */
+    fun writeSingleHash(file: File, outFileName: String) {
+        val out = File(file.parentFile, outFileName)
+        val hash = sha256(file)
+        out.writeText("$hash  ${file.name}\n")
+    }
+
+    /** Appends "<sha256>  <filename>" to hashes.sha256 (optional helper). */
+    fun appendHashLine(caseDir: File, file: File, outFileName: String = "hashes.sha256") {
+        val out = File(caseDir, outFileName)
+        val hash = sha256(file)
+        out.appendText("$hash  ${file.name}\n")
     }
 }
