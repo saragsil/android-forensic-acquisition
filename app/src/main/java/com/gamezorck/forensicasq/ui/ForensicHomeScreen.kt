@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,7 +17,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.gamezorck.forensicasq.collectors.*
@@ -39,6 +43,14 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+
+    // Focus/keyboard helpers (tap anywhere to clear cursor)
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    fun clearUiFocus() {
+        focusManager.clearFocus()
+        keyboard?.hide()
+    }
 
     // Logs
     val logs = remember { mutableStateListOf<String>() }
@@ -68,25 +80,32 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
         Scaffold(
             topBar = { CenterAlignedTopAppBar(title = { Text("Forensic Acquisition") }) }
         ) { padding ->
-            Column(
-                modifier = Modifier.padding(padding).padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .pointerInput(Unit) { detectTapGestures { clearUiFocus() } }
             ) {
-                Text("No active case", style = MaterialTheme.typography.titleLarge)
-                Text(
-                    "Go back to Case Management and create/select a case first.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Button(
-                    onClick = onBackToCases,
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("Back to Case Management") }
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("No active case", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "Go back to Case Management and create/select a case first.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Button(
+                        onClick = { clearUiFocus(); onBackToCases() },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Back to Case Management") }
+                }
             }
         }
         return
     }
 
-    // Permission launchers (still useful if user denied earlier)
+    // Permission launchers
     val contactsPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -125,13 +144,16 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
             CenterAlignedTopAppBar(
                 title = { Text("Forensic Acquisition") },
                 navigationIcon = {
-                    IconButton(onClick = onBackToCases, enabled = !isBusy) {
+                    IconButton(
+                        onClick = { clearUiFocus(); onBackToCases() },
+                        enabled = !isBusy
+                    ) {
                         Icon(Icons.Outlined.ArrowBack, contentDescription = "Back to Cases")
                     }
                 },
                 actions = {
                     IconButton(
-                        onClick = { logs.clear(); logUi("Logs cleared.") },
+                        onClick = { clearUiFocus(); logs.clear(); logUi("Logs cleared.") },
                         enabled = !isBusy
                     ) {
                         Icon(Icons.Outlined.DeleteSweep, contentDescription = "Clear logs")
@@ -142,7 +164,12 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
 
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                // Tap anywhere on background -> clear focus
+                .pointerInput(Unit) { detectTapGestures(onTap = { clearUiFocus() }) }
+        ) {
 
             Column(
                 modifier = Modifier
@@ -155,6 +182,7 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
                 CaseCard(
                     casePath = caseDir.absolutePath,
                     onCopy = {
+                        clearUiFocus()
                         copyToClipboard(context, caseDir.absolutePath)
                         logUi("Case path copied to clipboard.")
                     }
@@ -171,6 +199,7 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
                                 status = deviceStatus,
                                 enabled = !isBusy,
                                 onClick = {
+                                    clearUiFocus()
                                     runJob("Collecting device info…") {
                                         val logger = ForensicLogger(caseDir)
                                         logger.log("Starting DeviceInfo acquisition")
@@ -202,6 +231,7 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
                                 count = appsCount,
                                 enabled = !isBusy,
                                 onClick = {
+                                    clearUiFocus()
                                     runJob("Collecting installed apps…") {
                                         val logger = ForensicLogger(caseDir)
                                         logger.log("Starting Installed Apps acquisition")
@@ -237,6 +267,8 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
                                 count = contactsCount,
                                 enabled = !isBusy,
                                 onClick = {
+                                    clearUiFocus()
+
                                     if (!PermissionUtil.hasReadContacts(context)) {
                                         logUi("Requesting READ_CONTACTS...")
                                         contactsPermissionLauncher.launch(android.Manifest.permission.READ_CONTACTS)
@@ -275,6 +307,8 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
                                 count = callsCount,
                                 enabled = !isBusy,
                                 onClick = {
+                                    clearUiFocus()
+
                                     if (!PermissionUtil.hasReadCallLog(context)) {
                                         logUi("Requesting READ_CALL_LOG...")
                                         callLogPermissionLauncher.launch(android.Manifest.permission.READ_CALL_LOG)
@@ -315,6 +349,8 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
                         fullWidth = true,
                         enabled = !isBusy,
                         onClick = {
+                            clearUiFocus()
+
                             if (!PermissionUtil.hasReadSms(context)) {
                                 logUi("Requesting READ_SMS...")
                                 smsPermissionLauncher.launch(android.Manifest.permission.READ_SMS)
@@ -347,6 +383,7 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
 
                 Button(
                     onClick = {
+                        clearUiFocus()
                         val results = AppState.getResults()
                         if (results.isEmpty()) {
                             logUi("ERROR: No artifacts collected yet.")
@@ -374,8 +411,10 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
                     Spacer(Modifier.width(8.dp))
                     Text("Generate Export Pack")
                 }
+
                 OutlinedButton(
                     onClick = {
+                        clearUiFocus()
                         val zip = File(caseDir, "export.zip")
                         val sha = File(caseDir, "export.zip.sha256")
 
@@ -385,7 +424,7 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
                             return@OutlinedButton
                         }
 
-                        ShareUtil.shareExportPack(context, caseDir, zip, sha)
+                        ShareUtil.shareExportPack(context, zip, sha)
                         logUi("Sharing export pack: export.zip")
                     },
                     enabled = !isBusy,
@@ -472,7 +511,7 @@ private fun ActionRow(
     right: @Composable () -> Unit
 ) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val singleColumn = maxWidth < 360.dp   // ρύθμισέ το αν θες
+        val singleColumn = maxWidth < 360.dp
 
         if (singleColumn) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

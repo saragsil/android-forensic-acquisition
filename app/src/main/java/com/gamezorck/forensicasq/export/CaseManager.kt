@@ -19,10 +19,63 @@ object CaseManager {
         return safe.take(40)
     }
 
+    /** Returns true if a case directory already exists for this name (after sanitize). */
+    fun caseExists(context: Context, caseName: String): Boolean {
+        val safe = sanitizeCaseName(caseName)
+        if (safe.isBlank()) return false
+        return File(exportsRoot(context), safe).exists()
+    }
+
     /**
-     * Creates (if missing) or opens an existing case directory:
-     * /Android/data/<pkg>/files/exports/<CaseName>/
+     * Creates a NEW case directory. If it already exists -> throws.
+     * Path: /Android/data/<pkg>/files/exports/<CaseName>/
      */
+    fun createNewCase(context: Context, caseName: String): File {
+        val safeName = sanitizeCaseName(caseName)
+        require(safeName.isNotBlank()) { "Case name cannot be blank." }
+
+        val dir = File(exportsRoot(context), safeName)
+        require(!dir.exists()) { "Case name already exists." }
+
+        dir.mkdirs()
+
+        ChainOfCustody.record(
+            dir,
+            "CASE_CREATED",
+            "caseName=$safeName | path=${dir.absolutePath}"
+        )
+
+        return dir
+    }
+
+    /**
+     * Opens an EXISTING case directory. If it does not exist -> throws.
+     * Path: /Android/data/<pkg>/files/exports/<CaseName>/
+     */
+    fun openExistingCase(context: Context, caseName: String): File {
+        val safeName = sanitizeCaseName(caseName)
+        require(safeName.isNotBlank()) { "Case name cannot be blank." }
+
+        val dir = File(exportsRoot(context), safeName)
+        require(dir.exists() && dir.isDirectory) { "Case does not exist." }
+
+        ChainOfCustody.record(
+            dir,
+            "CASE_OPENED",
+            "caseName=$safeName | path=${dir.absolutePath}"
+        )
+
+        return dir
+    }
+
+    /**
+     * Old behavior: create if missing, else open.
+     * Keep it only if you need it in older code paths.
+     */
+    @Deprecated(
+        message = "Use createNewCase() or openExistingCase() to enforce unique names correctly.",
+        replaceWith = ReplaceWith("createNewCase(context, caseName)")
+    )
     fun openOrCreateCase(context: Context, caseName: String): File {
         val safeName = sanitizeCaseName(caseName)
         require(safeName.isNotBlank()) { "Case name cannot be blank." }
@@ -32,7 +85,6 @@ object CaseManager {
         val existedBefore = dir.exists()
         if (!existedBefore) dir.mkdirs()
 
-        // Chain of Custody
         if (!existedBefore) {
             ChainOfCustody.record(
                 dir,
@@ -61,8 +113,8 @@ object CaseManager {
 
     fun deleteCase(caseDir: File): Boolean {
         val ok = caseDir.deleteRecursively()
-        // δεν μπορούμε να γράψουμε custody μέσα στο case αφού διαγράφηκε,
-        // οπότε αυτό το event καλύτερα να το γράφει το UI πριν το delete.
+        // Δεν γράφουμε custody εδώ γιατί ο φάκελος διαγράφεται.
+        // Το UI μπορεί να γράφει "CASE_DELETED" πριν το delete, αν θέλετε.
         return ok
     }
 }
