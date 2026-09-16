@@ -134,11 +134,9 @@ Or open the project in Android Studio and run the `app` configuration. Grant the
 
 Potential future enhancements include:
 
-- Browser history — a Google Takeout (`BrowserHistory.json`) importer is drafted in
-  `collectors/BrowserHistoryCollector.kt`, but the file is currently commented out in
-  full and is not wired into the UI. Note that it imports an exported archive rather
-  than acquiring history from the device, since browser history providers are not
-  readable by third-party applications.
+- Browser history — browser history providers are not readable by third-party
+  applications, so this would have to be an import of a Google Takeout
+  (`BrowserHistory.json`) archive rather than an on-device acquisition.
 - Calendar events acquisition
 - Media metadata analysis
 - Network and Wi-Fi artifacts
