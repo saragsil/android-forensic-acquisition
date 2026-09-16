@@ -2,22 +2,47 @@ package com.gamezorck.forensicasq.ui
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Security
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.gamezorck.forensicasq.util.PermissionUtil
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     val permissions = remember {
         arrayOf(
@@ -27,13 +52,28 @@ fun SettingsScreen(onBack: () -> Unit) {
         )
     }
 
+    var okContacts by remember { mutableStateOf(false) }
+    var okCalls by remember { mutableStateOf(false) }
+    var okSms by remember { mutableStateOf(false) }
+
+    fun refreshPermissionState() {
+        okContacts = PermissionUtil.hasReadContacts(context)
+        okCalls = PermissionUtil.hasReadCallLog(context)
+        okSms = PermissionUtil.hasReadSms(context)
+    }
+
+    LaunchedEffect(Unit) { refreshPermissionState() }
+
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { /* no-op */ }
+    ) { results ->
+        refreshPermissionState()
 
-    val okContacts = PermissionUtil.hasReadContacts(context)
-    val okCalls = PermissionUtil.hasReadCallLog(context)
-    val okSms = PermissionUtil.hasReadSms(context)
+        val granted = results.values.count { it }
+        scope.launch {
+            snackbarHostState.showSnackbar("Permissions granted: $granted / ${results.size}")
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -45,7 +85,8 @@ fun SettingsScreen(onBack: () -> Unit) {
                     }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
 
         Column(
@@ -56,7 +97,9 @@ fun SettingsScreen(onBack: () -> Unit) {
         ) {
             ElevatedCard {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -66,13 +109,13 @@ fun SettingsScreen(onBack: () -> Unit) {
                     }
 
                     Text(
-                        "Grant permissions to allow logical acquisition from the emulator.",
+                        "Grant permissions to allow logical acquisition from the emulator/device.",
                         style = MaterialTheme.typography.bodySmall
                     )
 
-                    Text("READ_CONTACTS: ${if (okContacts) "GRANTED ✅" else "DENIED ❌"}", style = MaterialTheme.typography.bodySmall)
-                    Text("READ_CALL_LOG: ${if (okCalls) "GRANTED ✅" else "DENIED ❌"}", style = MaterialTheme.typography.bodySmall)
-                    Text("READ_SMS: ${if (okSms) "GRANTED ✅" else "DENIED ❌"}", style = MaterialTheme.typography.bodySmall)
+                    PermissionLine("READ_CONTACTS", okContacts)
+                    PermissionLine("READ_CALL_LOG", okCalls)
+                    PermissionLine("READ_SMS", okSms)
 
                     Button(
                         onClick = { launcher.launch(permissions) },
@@ -82,4 +125,10 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
     }
+}
+
+@Composable
+private fun PermissionLine(label: String, granted: Boolean) {
+    val status = if (granted) "GRANTED ✅" else "DENIED ❌"
+    Text("$label: $status", style = MaterialTheme.typography.bodySmall)
 }

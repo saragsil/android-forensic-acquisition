@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">ForensicAsq</string>
+
+    <!-- Provenance / format metadata (not shown in UI) -->
+    <string name="wm_schema_hint" translatable="false">integrity+export:1</string>
+    <string name="wm_signature_hint" translatable="false">sig:%1$s</string>
 </resources>

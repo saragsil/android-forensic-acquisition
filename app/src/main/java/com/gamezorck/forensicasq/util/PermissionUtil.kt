@@ -1,40 +1,42 @@
 package com.gamezorck.forensicasq.util
 
 import android.Manifest
-import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 
+/**
+ * Centralized permission helpers for forensic artifact acquisition.
+ *
+ * NOTE:
+ * - Requesting permissions is handled via ActivityResultLauncher in UI.
+ * - This utility ONLY checks permission state.
+ */
 object PermissionUtil {
 
-    const val REQ_CONTACTS = 1001
-    const val REQ_CALL_LOG = 1002
+    /** Permissions required for full logical acquisition */
+    val requiredPermissions = arrayOf(
+        Manifest.permission.READ_CONTACTS,
+        Manifest.permission.READ_CALL_LOG,
+        Manifest.permission.READ_SMS
+    )
+
+    fun hasPermission(context: Context, permission: String): Boolean =
+        ContextCompat.checkSelfPermission(
+            context,
+            permission
+        ) == PackageManager.PERMISSION_GRANTED
 
     fun hasReadContacts(context: Context): Boolean =
-        ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.READ_CONTACTS
-        ) == PackageManager.PERMISSION_GRANTED
-
-    fun requestReadContacts(activity: Activity) {
-        ActivityCompat.requestPermissions(
-            activity,
-            arrayOf(Manifest.permission.READ_CONTACTS),
-            REQ_CONTACTS
-        )
-    }
+        hasPermission(context, Manifest.permission.READ_CONTACTS)
 
     fun hasReadCallLog(context: Context): Boolean =
-        ContextCompat.checkSelfPermission(
-            context,
-            android.Manifest.permission.READ_CALL_LOG
-        ) == PackageManager.PERMISSION_GRANTED
+        hasPermission(context, Manifest.permission.READ_CALL_LOG)
 
     fun hasReadSms(context: Context): Boolean =
-        ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.READ_SMS
-        ) == PackageManager.PERMISSION_GRANTED
+        hasPermission(context, Manifest.permission.READ_SMS)
+
+    /** True if ALL required permissions are granted */
+    fun hasAllRequiredPermissions(context: Context): Boolean =
+        requiredPermissions.all { hasPermission(context, it) }
 }

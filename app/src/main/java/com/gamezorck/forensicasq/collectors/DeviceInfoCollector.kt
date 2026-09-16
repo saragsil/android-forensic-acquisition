@@ -8,11 +8,11 @@ import java.io.File
 
 class DeviceInfoCollector : ArtifactCollector {
 
-    override val artifactName: String = "device_info"
+    override val artifactName: String = ARTIFACT_NAME
 
     override fun collect(context: Context, caseDir: File): ArtifactResult {
         return try {
-            val json = JSONObject().apply {
+            val info = JSONObject().apply {
                 put("manufacturer", Build.MANUFACTURER)
                 put("model", Build.MODEL)
                 put("brand", Build.BRAND)
@@ -23,16 +23,15 @@ class DeviceInfoCollector : ArtifactCollector {
                 put("fingerprint", Build.FINGERPRINT)
             }
 
-            val outFile = File(caseDir, "device.json")
-            outFile.writeText(json.toString(4))
+            val outFile = File(caseDir, OUTPUT_FILE)
+            outFile.writeText(info.toString(JSON_INDENT))
 
             ArtifactResult(
                 artifact = artifactName,
                 success = true,
-                recordCount = json.length(),
+                recordCount = info.length(), // number of fields
                 outputFile = outFile.name
             )
-
         } catch (e: Exception) {
             ArtifactResult(
                 artifact = artifactName,
@@ -40,5 +39,11 @@ class DeviceInfoCollector : ArtifactCollector {
                 error = e.message
             )
         }
+    }
+
+    private companion object {
+        private const val ARTIFACT_NAME = "device_info"
+        private const val OUTPUT_FILE = "device.json"
+        private const val JSON_INDENT = 4
     }
 }

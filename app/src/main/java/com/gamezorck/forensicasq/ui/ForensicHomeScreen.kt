@@ -6,36 +6,85 @@ import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Call
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Contacts
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.DeleteSweep
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Sms
+import androidx.compose.material.icons.outlined.Verified
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.gamezorck.forensicasq.collectors.*
+import com.gamezorck.forensicasq.collectors.AppsCollector
+import com.gamezorck.forensicasq.collectors.CallsCollector
+import com.gamezorck.forensicasq.collectors.ContactsCollector
+import com.gamezorck.forensicasq.collectors.DeviceInfoCollector
+import com.gamezorck.forensicasq.collectors.SmsCollector
 import com.gamezorck.forensicasq.export.AppState
 import com.gamezorck.forensicasq.export.ExportPackGenerator
 import com.gamezorck.forensicasq.logging.ForensicLogger
+import com.gamezorck.forensicasq.model.ArtifactResult
 import com.gamezorck.forensicasq.util.PermissionUtil
 import com.gamezorck.forensicasq.util.ShareUtil
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.io.File
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,36 +92,9 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-
-    // Focus/keyboard helpers (tap anywhere to clear cursor)
     val focusManager = LocalFocusManager.current
-    val keyboard = LocalSoftwareKeyboardController.current
-    fun clearUiFocus() {
-        focusManager.clearFocus()
-        keyboard?.hide()
-    }
 
-    // Logs
-    val logs = remember { mutableStateListOf<String>() }
-    fun ts(): String = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
-    fun logUi(msg: String) { logs.add("[${ts()}] $msg") }
-
-    // Busy UI
-    var isBusy by remember { mutableStateOf(false) }
-    var busyLabel by remember { mutableStateOf("") }
-
-    fun runJob(label: String, block: suspend () -> Unit) {
-        scope.launch {
-            isBusy = true
-            busyLabel = label
-            try {
-                block()
-            } finally {
-                isBusy = false
-                busyLabel = ""
-            }
-        }
-    }
+    fun clearUiFocus() = focusManager.clearFocus()
 
     // Case dir (must exist)
     val caseDir = AppState.currentCaseDir
@@ -103,6 +125,31 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
             }
         }
         return
+    }
+
+    // Activity log (UI-side)
+    val logs = remember { mutableStateListOf<String>() }
+    val timeFmt = remember { DateTimeFormatter.ofPattern("HH:mm:ss") }
+    fun logUi(msg: String) {
+        val ts = LocalTime.now().format(timeFmt)
+        logs.add("[$ts] $msg")
+    }
+
+    // Busy UI
+    var isBusy by remember { mutableStateOf(false) }
+    var busyLabel by remember { mutableStateOf("") }
+
+    fun runJob(label: String, block: suspend () -> Unit) {
+        scope.launch {
+            isBusy = true
+            busyLabel = label
+            try {
+                block()
+            } finally {
+                isBusy = false
+                busyLabel = ""
+            }
+        }
     }
 
     // Permission launchers
@@ -139,6 +186,28 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
     var smsCount by remember { mutableStateOf<Int?>(null) }
     var appsCount by remember { mutableStateOf<Int?>(null) }
 
+    suspend fun runCollector(
+        label: String,
+        artifactLabel: String,
+        collect: suspend () -> ArtifactResult,
+        onSuccess: (ArtifactResult) -> Unit,
+        onError: (ArtifactResult) -> Unit
+    ) {
+        val logger = ForensicLogger(caseDir)
+        logger.log("Starting $artifactLabel acquisition")
+
+        val result = withContext(Dispatchers.IO) { collect() }
+        AppState.upsertResult(result)
+
+        if (result.success) {
+            logger.log("$artifactLabel acquired: ${result.outputFile ?: "(no file)"} (${result.recordCount})")
+            onSuccess(result)
+        } else {
+            logger.log("ERROR: $artifactLabel failed: ${result.error}")
+            onError(result)
+        }
+    }
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -167,10 +236,8 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                // Tap anywhere on background -> clear focus
-                .pointerInput(Unit) { detectTapGestures(onTap = { clearUiFocus() }) }
+                .pointerInput(Unit) { detectTapGestures { clearUiFocus() } }
         ) {
-
             Column(
                 modifier = Modifier
                     .padding(padding)
@@ -201,23 +268,19 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
                                 onClick = {
                                     clearUiFocus()
                                     runJob("Collecting device info…") {
-                                        val logger = ForensicLogger(caseDir)
-                                        logger.log("Starting DeviceInfo acquisition")
-
-                                        val result = withContext(Dispatchers.IO) {
-                                            DeviceInfoCollector().collect(context, caseDir)
-                                        }
-                                        AppState.upsertResult(result)
-
-                                        if (result.success) {
-                                            deviceStatus = ActionStatus.Ok
-                                            logger.log("DeviceInfo acquired: ${result.outputFile}")
-                                            logUi("OK: device.json written")
-                                        } else {
-                                            deviceStatus = ActionStatus.Error
-                                            logger.log("ERROR: DeviceInfoCollector failed: ${result.error}")
-                                            logUi("ERROR: DeviceInfo failed: ${result.error}")
-                                        }
+                                        runCollector(
+                                            label = "Collecting device info…",
+                                            artifactLabel = "DeviceInfo",
+                                            collect = { DeviceInfoCollector().collect(context, caseDir) },
+                                            onSuccess = { r ->
+                                                deviceStatus = ActionStatus.Ok
+                                                logUi("OK: ${r.outputFile ?: "device.json"} written")
+                                            },
+                                            onError = { r ->
+                                                deviceStatus = ActionStatus.Error
+                                                logUi("ERROR: device info failed: ${r.error}")
+                                            }
+                                        )
                                     }
                                 }
                             )
@@ -233,24 +296,20 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
                                 onClick = {
                                     clearUiFocus()
                                     runJob("Collecting installed apps…") {
-                                        val logger = ForensicLogger(caseDir)
-                                        logger.log("Starting Installed Apps acquisition")
-
-                                        val result = withContext(Dispatchers.IO) {
-                                            AppsCollector().collect(context, caseDir)
-                                        }
-                                        AppState.upsertResult(result)
-
-                                        if (result.success) {
-                                            appsStatus = ActionStatus.Ok
-                                            appsCount = result.recordCount
-                                            logger.log("Installed apps acquired: ${result.outputFile} (${result.recordCount})")
-                                            logUi("OK: apps.json written (${result.recordCount})")
-                                        } else {
-                                            appsStatus = ActionStatus.Error
-                                            logger.log("ERROR: AppsCollector failed: ${result.error}")
-                                            logUi("ERROR: apps failed: ${result.error}")
-                                        }
+                                        runCollector(
+                                            label = "Collecting installed apps…",
+                                            artifactLabel = "InstalledApps",
+                                            collect = { AppsCollector().collect(context, caseDir) },
+                                            onSuccess = { r ->
+                                                appsStatus = ActionStatus.Ok
+                                                appsCount = r.recordCount
+                                                logUi("OK: apps.json written (${r.recordCount})")
+                                            },
+                                            onError = { r ->
+                                                appsStatus = ActionStatus.Error
+                                                logUi("ERROR: apps failed: ${r.error}")
+                                            }
+                                        )
                                     }
                                 }
                             )
@@ -276,24 +335,20 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
                                     }
 
                                     runJob("Collecting contacts…") {
-                                        val logger = ForensicLogger(caseDir)
-                                        logger.log("Starting Contacts acquisition")
-
-                                        val result = withContext(Dispatchers.IO) {
-                                            ContactsCollector().collect(context, caseDir)
-                                        }
-                                        AppState.upsertResult(result)
-
-                                        if (result.success) {
-                                            contactsStatus = ActionStatus.Ok
-                                            contactsCount = result.recordCount
-                                            logger.log("Contacts acquired: ${result.outputFile} (${result.recordCount})")
-                                            logUi("OK: contacts.json written (${result.recordCount})")
-                                        } else {
-                                            contactsStatus = ActionStatus.Error
-                                            logger.log("ERROR: ContactsCollector failed: ${result.error}")
-                                            logUi("ERROR: contacts failed: ${result.error}")
-                                        }
+                                        runCollector(
+                                            label = "Collecting contacts…",
+                                            artifactLabel = "Contacts",
+                                            collect = { ContactsCollector().collect(context, caseDir) },
+                                            onSuccess = { r ->
+                                                contactsStatus = ActionStatus.Ok
+                                                contactsCount = r.recordCount
+                                                logUi("OK: contacts.json written (${r.recordCount})")
+                                            },
+                                            onError = { r ->
+                                                contactsStatus = ActionStatus.Error
+                                                logUi("ERROR: contacts failed: ${r.error}")
+                                            }
+                                        )
                                     }
                                 }
                             )
@@ -316,24 +371,20 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
                                     }
 
                                     runJob("Collecting call logs…") {
-                                        val logger = ForensicLogger(caseDir)
-                                        logger.log("Starting Call Logs acquisition")
-
-                                        val result = withContext(Dispatchers.IO) {
-                                            CallsCollector().collect(context, caseDir)
-                                        }
-                                        AppState.upsertResult(result)
-
-                                        if (result.success) {
-                                            callsStatus = ActionStatus.Ok
-                                            callsCount = result.recordCount
-                                            logger.log("Call logs acquired: ${result.outputFile} (${result.recordCount})")
-                                            logUi("OK: calls.json written (${result.recordCount})")
-                                        } else {
-                                            callsStatus = ActionStatus.Error
-                                            logger.log("ERROR: CallsCollector failed: ${result.error}")
-                                            logUi("ERROR: calls failed: ${result.error}")
-                                        }
+                                        runCollector(
+                                            label = "Collecting call logs…",
+                                            artifactLabel = "CallLogs",
+                                            collect = { CallsCollector().collect(context, caseDir) },
+                                            onSuccess = { r ->
+                                                callsStatus = ActionStatus.Ok
+                                                callsCount = r.recordCount
+                                                logUi("OK: calls.json written (${r.recordCount})")
+                                            },
+                                            onError = { r ->
+                                                callsStatus = ActionStatus.Error
+                                                logUi("ERROR: calls failed: ${r.error}")
+                                            }
+                                        )
                                     }
                                 }
                             )
@@ -341,8 +392,8 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
                     )
 
                     ArtifactCard(
-                        title = "SMS (optional)",
-                        subtitle = "Best-effort acquisition",
+                        title = "SMS",
+                        subtitle = "Best-effort (Android restrictions may apply)",
                         icon = Icons.Outlined.Sms,
                         status = smsStatus,
                         count = smsCount,
@@ -358,24 +409,20 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
                             }
 
                             runJob("Collecting SMS…") {
-                                val logger = ForensicLogger(caseDir)
-                                logger.log("Starting SMS acquisition (best-effort)")
-
-                                val result = withContext(Dispatchers.IO) {
-                                    SmsCollector().collect(context, caseDir)
-                                }
-                                AppState.upsertResult(result)
-
-                                if (result.success) {
-                                    smsStatus = ActionStatus.Ok
-                                    smsCount = result.recordCount
-                                    logger.log("SMS acquired: ${result.outputFile} (${result.recordCount})")
-                                    logUi("OK: sms.json written (${result.recordCount})")
-                                } else {
-                                    smsStatus = ActionStatus.Error
-                                    logger.log("ERROR: SmsCollector failed: ${result.error}")
-                                    logUi("ERROR: sms failed: ${result.error}")
-                                }
+                                runCollector(
+                                    label = "Collecting SMS…",
+                                    artifactLabel = "SMS",
+                                    collect = { SmsCollector().collect(context, caseDir) },
+                                    onSuccess = { r ->
+                                        smsStatus = ActionStatus.Ok
+                                        smsCount = r.recordCount
+                                        logUi("OK: sms.json written (${r.recordCount})")
+                                    },
+                                    onError = { r ->
+                                        smsStatus = ActionStatus.Error
+                                        logUi("ERROR: sms failed: ${r.error}")
+                                    }
+                                )
                             }
                         }
                     )
@@ -424,7 +471,7 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
                             return@OutlinedButton
                         }
 
-                        ShareUtil.shareExportPack(context, zip, sha)
+                        ShareUtil.shareExportPack(context, zip)
                         logUi("Sharing export pack: export.zip")
                     },
                     enabled = !isBusy,
@@ -456,7 +503,6 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
                 }
             }
 
-            // Loading overlay (blocks UI while busy)
             if (isBusy) {
                 AlertDialog(
                     onDismissRequest = { /* locked while working */ },
@@ -484,10 +530,17 @@ private fun CaseCard(casePath: String, onCopy: () -> Unit) {
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Icon(Icons.Outlined.Folder, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Current Case", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Text(
+                    "Current Case",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
                 TextButton(onClick = onCopy) {
                     Icon(Icons.Outlined.ContentCopy, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
@@ -541,15 +594,10 @@ private fun ArtifactCard(
     enabled: Boolean = true,
     onClick: () -> Unit
 ) {
-    val container = when (status) {
-        ActionStatus.Ok -> MaterialTheme.colorScheme.secondaryContainer
-        ActionStatus.Error -> MaterialTheme.colorScheme.errorContainer
-        ActionStatus.NotRun -> MaterialTheme.colorScheme.surfaceVariant
-    }
-    val content = when (status) {
-        ActionStatus.Ok -> MaterialTheme.colorScheme.onSecondaryContainer
-        ActionStatus.Error -> MaterialTheme.colorScheme.onErrorContainer
-        ActionStatus.NotRun -> MaterialTheme.colorScheme.onSurfaceVariant
+    val (container, content) = when (status) {
+        ActionStatus.Ok -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
+        ActionStatus.Error -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
+        ActionStatus.NotRun -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
     }
 
     ElevatedCard(
@@ -575,7 +623,6 @@ private fun ArtifactCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-
                 Text(
                     subtitle,
                     style = MaterialTheme.typography.bodySmall,
@@ -584,10 +631,12 @@ private fun ArtifactCard(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+
             if (count != null) {
                 AssistChip(onClick = {}, label = { Text(count.toString()) })
+                Spacer(Modifier.width(6.dp))
             }
-            Spacer(Modifier.width(6.dp))
+
             Icon(
                 imageVector = when (status) {
                     ActionStatus.Ok -> Icons.Outlined.CheckCircle

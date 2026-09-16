@@ -9,11 +9,12 @@ import java.io.File
 
 class SmsCollector : ArtifactCollector {
 
-    override val artifactName: String = "sms"
+    override val artifactName: String = ARTIFACT_NAME
 
     override fun collect(context: Context, caseDir: File): ArtifactResult {
         return try {
             val resolver = context.contentResolver
+            val items = JSONArray()
 
             val projection = arrayOf(
                 Telephony.Sms._ID,
@@ -23,15 +24,12 @@ class SmsCollector : ArtifactCollector {
                 Telephony.Sms.TYPE
             )
 
-            val items = JSONArray()
-            var count = 0
-
             resolver.query(
                 Telephony.Sms.CONTENT_URI,
                 projection,
                 null,
                 null,
-                Telephony.Sms.DATE + " DESC"
+                "${Telephony.Sms.DATE} DESC"
             )?.use { cursor ->
                 val idIdx = cursor.getColumnIndexOrThrow(Telephony.Sms._ID)
                 val addrIdx = cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
@@ -40,32 +38,32 @@ class SmsCollector : ArtifactCollector {
                 val typeIdx = cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE)
 
                 while (cursor.moveToNext()) {
-                    val obj = JSONObject().apply {
-                        put("sms_id", cursor.getString(idIdx))
-                        put("address", cursor.getString(addrIdx) ?: "")
-                        put("body", cursor.getString(bodyIdx) ?: "")
-                        put("date_epoch_ms", cursor.getLong(dateIdx))
-                        put("type", cursor.getInt(typeIdx)) // inbox/sent/etc
-                    }
-                    items.put(obj)
-                    count++
+                    items.put(
+                        JSONObject().apply {
+                            put("sms_id", cursor.getString(idIdx))
+                            put("address", cursor.getString(addrIdx).orEmpty())
+                            put("body", cursor.getString(bodyIdx).orEmpty())
+                            put("date_epoch_ms", cursor.getLong(dateIdx))
+                            put("type", cursor.getInt(typeIdx))
+                        }
+                    )
                 }
             }
 
             val out = JSONObject().apply {
                 put("artifact", artifactName)
-                put("count", count)
+                put("count", items.length())
                 put("items", items)
-                put("note", "Best-effort SMS acquisition. Availability depends on Android restrictions and granted permissions.")
+                put("note", NOTE)
             }
 
-            val outFile = File(caseDir, "sms.json")
-            outFile.writeText(out.toString(4))
+            val outFile = File(caseDir, OUTPUT_FILE)
+            outFile.writeText(out.toString(JSON_INDENT))
 
             ArtifactResult(
                 artifact = artifactName,
                 success = true,
-                recordCount = count,
+                recordCount = items.length(),
                 outputFile = outFile.name
             )
         } catch (se: SecurityException) {
@@ -81,5 +79,14 @@ class SmsCollector : ArtifactCollector {
                 error = e.message
             )
         }
+    }
+
+    private companion object {
+        private const val ARTIFACT_NAME = "sms"
+        private const val OUTPUT_FILE = "sms.json"
+        private const val JSON_INDENT = 4
+
+        private const val NOTE =
+            "Best-effort SMS acquisition. Availability depends on Android restrictions and granted permissions."
     }
 }

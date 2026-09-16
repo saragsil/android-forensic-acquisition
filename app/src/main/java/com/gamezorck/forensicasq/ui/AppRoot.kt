@@ -1,28 +1,34 @@
 package com.gamezorck.forensicasq.ui
 
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import com.gamezorck.forensicasq.export.AppState
-import java.io.File
 
-private enum class Screen { Case, Dashboard }
+private enum class RootScreen { Case, Dashboard }
 
 @Composable
 fun AppRoot() {
-    var screen by remember { mutableStateOf(Screen.Case) }
+    var showSplash by rememberSaveable { mutableStateOf(true) }
+    var screen by rememberSaveable { mutableStateOf(RootScreen.Case) }
+
+    if (showSplash) {
+        SplashScreen(onFinished = { showSplash = false })
+        return
+    }
 
     when (screen) {
-        Screen.Case -> {
-            CaseScreen(
-                onOpenCase = { dir ->
-                    AppState.resetCase(dir)      // θέτει το ενεργό case
-                    screen = Screen.Dashboard    // ΠΑΜΕ στην επόμενη “σελίδα”
-                }
-            )
-        }
-        Screen.Dashboard -> {
-            ForensicHomeScreen(
-                onBackToCases = { screen = Screen.Case }
-            )
-        }
+        RootScreen.Case -> CaseScreen(
+            onOpenCase = { dir ->
+                AppState.resetCase(dir)
+                screen = RootScreen.Dashboard
+            }
+        )
+
+        RootScreen.Dashboard -> ForensicHomeScreen(
+            onBackToCases = { screen = RootScreen.Case }
+        )
     }
 }

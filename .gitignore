@@ -13,3 +13,10 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Forensic case output (acquired evidence must never be committed)
+CASE-*/
+/CASE-*
+
+# IDE
+/.idea/inspectionProfiles

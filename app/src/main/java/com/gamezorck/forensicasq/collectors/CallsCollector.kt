@@ -9,11 +9,12 @@ import java.io.File
 
 class CallsCollector : ArtifactCollector {
 
-    override val artifactName: String = "call_logs"
+    override val artifactName: String = ARTIFACT_NAME
 
     override fun collect(context: Context, caseDir: File): ArtifactResult {
         return try {
             val resolver = context.contentResolver
+            val calls = JSONArray()
 
             val projection = arrayOf(
                 CallLog.Calls._ID,
@@ -24,15 +25,12 @@ class CallsCollector : ArtifactCollector {
                 CallLog.Calls.CACHED_NAME
             )
 
-            val callsArray = JSONArray()
-            var count = 0
-
             resolver.query(
                 CallLog.Calls.CONTENT_URI,
                 projection,
                 null,
                 null,
-                CallLog.Calls.DATE + " DESC"
+                "${CallLog.Calls.DATE} DESC" // newest first (stable, explicit)
             )?.use { cursor ->
                 val idIdx = cursor.getColumnIndexOrThrow(CallLog.Calls._ID)
                 val numIdx = cursor.getColumnIndexOrThrow(CallLog.Calls.NUMBER)
@@ -42,32 +40,32 @@ class CallsCollector : ArtifactCollector {
                 val nameIdx = cursor.getColumnIndexOrThrow(CallLog.Calls.CACHED_NAME)
 
                 while (cursor.moveToNext()) {
-                    val obj = JSONObject().apply {
-                        put("call_id", cursor.getString(idIdx))
-                        put("number", cursor.getString(numIdx) ?: "")
-                        put("type", cursor.getInt(typeIdx))          // incoming/outgoing/missed
-                        put("date_epoch_ms", cursor.getLong(dateIdx))
-                        put("duration_sec", cursor.getLong(durIdx))
-                        put("cached_name", cursor.getString(nameIdx) ?: "")
-                    }
-                    callsArray.put(obj)
-                    count++
+                    calls.put(
+                        JSONObject().apply {
+                            put("call_id", cursor.getString(idIdx))
+                            put("number", cursor.getString(numIdx).orEmpty())
+                            put("type", cursor.getInt(typeIdx))
+                            put("date_epoch_ms", cursor.getLong(dateIdx))
+                            put("duration_sec", cursor.getLong(durIdx))
+                            put("cached_name", cursor.getString(nameIdx).orEmpty())
+                        }
+                    )
                 }
             }
 
             val out = JSONObject().apply {
                 put("artifact", artifactName)
-                put("count", count)
-                put("items", callsArray)
+                put("count", calls.length())
+                put("items", calls)
             }
 
-            val outFile = File(caseDir, "calls.json")
-            outFile.writeText(out.toString(4))
+            val outFile = File(caseDir, OUTPUT_FILE)
+            outFile.writeText(out.toString(JSON_INDENT))
 
             ArtifactResult(
                 artifact = artifactName,
                 success = true,
-                recordCount = count,
+                recordCount = calls.length(),
                 outputFile = outFile.name
             )
         } catch (e: Exception) {
@@ -77,5 +75,11 @@ class CallsCollector : ArtifactCollector {
                 error = e.message
             )
         }
+    }
+
+    private companion object {
+        private const val ARTIFACT_NAME = "call_logs"
+        private const val OUTPUT_FILE = "calls.json"
+        private const val JSON_INDENT = 4
     }
 }

@@ -13,6 +13,7 @@ object ZipExport {
         require(caseDir.exists() && caseDir.isDirectory) { "Invalid caseDir: ${caseDir.absolutePath}" }
 
         val zipFile = File(caseDir, zipName)
+        val tmpZip = File(caseDir, "$zipName.tmp")
 
         val custody = File(caseDir, "chain_of_custody.txt")
 
@@ -27,20 +28,21 @@ object ZipExport {
                 val name = f.name.lowercase()
                 if (name.endsWith(".zip")) return@filter false
 
-                // Always allow custody file (even if naming changes later)
                 if (f.name == custody.name) return@filter true
 
                 name.endsWith(".json") || name.endsWith(".sha256") || name.endsWith(".txt")
             }
-            ?.sortedWith(compareBy<File>(
-                // make sure custody + manifest appear early (optional, but nice)
-                { it.name != "chain_of_custody.txt" },
-                { it.name != "manifest.json" },
-                { it.name }
-            ))
+            ?.sortedWith(
+                compareBy<File>(
+                    { it.name != "chain_of_custody.txt" },
+                    { it.name != "manifest.json" },
+                    { it.name }
+                )
+            )
             ?: emptyList()
 
-        ZipOutputStream(FileOutputStream(zipFile)).use { zos ->
+        // Write to temp first to avoid partially-written export.zip
+        ZipOutputStream(FileOutputStream(tmpZip)).use { zos ->
             val buffer = ByteArray(8 * 1024)
 
             for (f in filesToZip) {
@@ -57,6 +59,11 @@ object ZipExport {
                 }
             }
         }
+
+        // Replace old zip atomically-ish
+        if (zipFile.exists()) zipFile.delete()
+        val ok = tmpZip.renameTo(zipFile)
+        require(ok && zipFile.exists()) { "Failed to finalize zip: ${zipFile.absolutePath}" }
 
         return zipFile
     }

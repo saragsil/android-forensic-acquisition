@@ -2,6 +2,7 @@ package com.gamezorck.forensicasq.collectors
 
 import android.content.Context
 import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
 import android.os.Build
 import com.gamezorck.forensicasq.model.ArtifactResult
 import org.json.JSONArray
@@ -10,83 +11,32 @@ import java.io.File
 
 class AppsCollector : ArtifactCollector {
 
-    override val artifactName: String = "installed_apps"
+    override val artifactName: String = ARTIFACT_NAME
 
     override fun collect(context: Context, caseDir: File): ArtifactResult {
         return try {
             val pm = context.packageManager
-
-            // On newer Android versions, use PackageInfoFlags; older uses int flags.
-            val packages: List<PackageInfo> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                pm.getInstalledPackages(android.content.pm.PackageManager.PackageInfoFlags.of(0))
-            } else {
-                @Suppress("DEPRECATION")
-                pm.getInstalledPackages(0)
-            }
+            val packages = getInstalledPackages(pm)
+                .sortedBy { it.packageName } // deterministic output
 
             val items = JSONArray()
-            var count = 0
-
             for (p in packages) {
-                val app = JSONObject().apply {
-                    put("package_name", p.packageName ?: "")
-
-                    val versionName = p.versionName ?: ""
-                    put("version_name", versionName)
-
-                    val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                        p.longVersionCode
-                    } else {
-                        @Suppress("DEPRECATION")
-                        p.versionCode.toLong()
-                    }
-                    put("version_code", versionCode)
-
-                    // Timestamps: may be 0 in some environments but usually available
-                    val firstInstall = p.firstInstallTime
-                    val lastUpdate = p.lastUpdateTime
-                    put("first_install_time_epoch_ms", firstInstall)
-                    put("last_update_time_epoch_ms", lastUpdate)
-
-                    // Flags (system/user) - via ApplicationInfo
-                    val ai = p.applicationInfo
-                    val flags = ai?.flags ?: 0
-
-                    put(
-                        "is_system_app",
-                        flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0
-                    )
-                    put(
-                        "is_updated_system_app",
-                        flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0
-                    )
-
-                    // Requested permissions (if any)
-                    val requestedPerms = JSONArray()
-                    val perms = p.requestedPermissions
-                    if (perms != null) {
-                        for (perm in perms) requestedPerms.put(perm)
-                    }
-                    put("requested_permissions", requestedPerms)
-                }
-
-                items.put(app)
-                count++
+                items.put(p.toJson())
             }
 
             val out = JSONObject().apply {
                 put("artifact", artifactName)
-                put("count", count)
+                put("count", packages.size)
                 put("items", items)
             }
 
-            val outFile = File(caseDir, "apps.json")
-            outFile.writeText(out.toString(4))
+            val outFile = File(caseDir, OUTPUT_FILE)
+            outFile.writeText(out.toString(JSON_INDENT))
 
             ArtifactResult(
                 artifact = artifactName,
                 success = true,
-                recordCount = count,
+                recordCount = packages.size,
                 outputFile = outFile.name
             )
         } catch (e: Exception) {
@@ -96,5 +46,48 @@ class AppsCollector : ArtifactCollector {
                 error = e.message
             )
         }
+    }
+
+    private fun getInstalledPackages(pm: PackageManager): List<PackageInfo> {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            pm.getInstalledPackages(PackageManager.PackageInfoFlags.of(0))
+        } else {
+            @Suppress("DEPRECATION")
+            pm.getInstalledPackages(0)
+        }
+    }
+
+    private fun PackageInfo.toJson(): JSONObject {
+        val flags = applicationInfo?.flags ?: 0
+
+        val requestedPerms = JSONArray().apply {
+            requestedPermissions?.forEach { put(it) }
+        }
+
+        return JSONObject().apply {
+            put("package_name", packageName)
+            put("version_name", versionName ?: "")
+            put("version_code", versionCodeLongCompat())
+            put("first_install_time_epoch_ms", firstInstallTime)
+            put("last_update_time_epoch_ms", lastUpdateTime)
+            put("is_system_app", flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0)
+            put("is_updated_system_app", flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0)
+            put("requested_permissions", requestedPerms)
+        }
+    }
+
+    private fun PackageInfo.versionCodeLongCompat(): Long {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            longVersionCode
+        } else {
+            @Suppress("DEPRECATION")
+            versionCode.toLong()
+        }
+    }
+
+    private companion object {
+        private const val ARTIFACT_NAME = "installed_apps"
+        private const val OUTPUT_FILE = "apps.json"
+        private const val JSON_INDENT = 4
     }
 }

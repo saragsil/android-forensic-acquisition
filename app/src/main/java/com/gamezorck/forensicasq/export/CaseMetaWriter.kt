@@ -7,7 +7,10 @@ import java.io.File
 object CaseMetaWriter {
 
     private const val FILE_NAME = "case_meta.json"
-    private const val SCHEMA_VERSION = 1
+    private const val SCHEMA_VERSION = 2
+    private const val JSON_INDENT = 2
+
+    private const val DEFAULT_ORGANIZATION = "Not Specified"
 
     fun write(caseDir: File, meta: CaseMeta): File {
         require(caseDir.exists() && caseDir.isDirectory) { "Invalid caseDir: ${caseDir.absolutePath}" }
@@ -16,7 +19,6 @@ object CaseMetaWriter {
             put("schemaVersion", SCHEMA_VERSION)
 
             put("caseName", meta.caseName)
-            put("caseNumber", meta.caseNumber)
 
             put("examiner", JSONObject().apply {
                 put("name", meta.examinerName)
@@ -28,27 +30,26 @@ object CaseMetaWriter {
             put("notes", meta.notes)
         }
 
-        val out = File(caseDir, FILE_NAME)
-        out.writeText(obj.toString(2))
-        return out
+        return File(caseDir, FILE_NAME).also { out ->
+            out.writeText(obj.toString(JSON_INDENT))
+        }
     }
 
     fun read(caseDir: File): CaseMeta? {
-        val f = File(caseDir, FILE_NAME)
-        if (!f.exists()) return null
+        val file = File(caseDir, FILE_NAME)
+        if (!file.exists() || !file.isFile) return null
 
         return try {
-            val obj = JSONObject(f.readText())
-            val examiner = obj.optJSONObject("examiner") ?: JSONObject()
+            val obj = JSONObject(file.readText())
+            val examiner = obj.optJSONObject("examiner")
 
             CaseMeta(
                 caseName = obj.optString("caseName", caseDir.name),
-                caseNumber = obj.optString("caseNumber", ""),
-                examinerName = examiner.optString("name", ""),
-                examinerPhone = examiner.optString("phone", ""),
-                examinerEmail = examiner.optString("email", ""),
-                notes = obj.optString("notes", ""),
-                organization = obj.optString("organization", "Not Specified")
+                examinerName = examiner?.optString("name", "") ?: "",
+                examinerPhone = examiner?.optString("phone", "") ?: "",
+                examinerEmail = examiner?.optString("email", "") ?: "",
+                organization = obj.optString("organization", DEFAULT_ORGANIZATION),
+                notes = obj.optString("notes", "")
             )
         } catch (_: Exception) {
             null

@@ -18,11 +18,14 @@ The application is designed to operate in a **controlled Android Emulator enviro
 
 ## 🧪 Target Environment
 
-- **Android Studio:** Ladybug 2024.2.1 Patch 3  
-- **Android Emulator:** Pixel 7 Pro  
-- **Android API Level:** 36  
-- **Programming Language:** Kotlin  
-- **UI Framework:** Android Views (non-Compose)  
+| | |
+|---|---|
+| **Language** | Kotlin 1.9.24 |
+| **UI Framework** | Jetpack Compose + Material 3 |
+| **Android Gradle Plugin** | 8.7.3 |
+| **compileSdk / targetSdk** | 35 |
+| **minSdk** | 29 (Android 10) |
+| **Test device** | Android Emulator — Pixel 7 Pro |
 
 The emulator is used as a **controlled forensic testbed**, allowing the creation of synthetic data (ground truth) for validation purposes.
 
@@ -32,30 +35,41 @@ The emulator is used as a **controlled forensic testbed**, allowing the creation
 
 The application supports the following artifact categories:
 
-- 📇 **Contacts** (ContactsContract)
-- 📞 **Call Logs** (CallLog.Calls)
-- 💬 **SMS Messages** (best-effort, subject to Android restrictions)
-- 📦 **Installed Applications & Permissions** (PackageManager)
-- 📱 **Device Information** (Android version, model, build fingerprint)
+- 📇 **Contacts** — `ContactsContract`
+- 📞 **Call Logs** — `CallLog.Calls`
+- 💬 **SMS Messages** — `Telephony.Sms` (best-effort, subject to Android restrictions)
+- 📦 **Installed Applications & Permissions** — `PackageManager`
+- 📱 **Device Information** — Android version, model, build fingerprint
+- 🌐 **Browser History** — best-effort, subject to provider availability
 
-> Note: SMS acquisition is implemented on a best-effort basis and may be limited by Android security restrictions, especially on newer API levels.
+> Note: SMS and browser history acquisition are implemented on a best-effort basis. Both are limited by Android security restrictions on newer API levels, where the corresponding content providers are restricted or unavailable to non-default applications.
 
 ---
 
 ## 📤 Output & Export Format
 
-Each acquisition generates a **case-based export directory** containing:
+Each acquisition generates a **case-based export directory** (`CASE-<uuid>/<timestamp>/`) containing:
 
+**Artifacts**
 - `contacts.json`
 - `calls.json`
-- `sms.json` (optional)
+- `sms.json`
 - `apps.json`
 - `device.json`
-- `manifest.json` (acquisition metadata)
-- `hashes.sha256` (SHA-256 integrity verification)
-- `logs.txt` (execution and error logs)
+- `browser_history.json`
 
-All outputs are stored in the application’s external files directory and can be extracted using `adb pull`.
+**Case & integrity metadata**
+- `case_meta.json` — case identity and acquisition parameters
+- `manifest.json` — acquisition metadata plus per-file `path`, `size` and `sha256`
+- `hashes.sha256` — SHA-256 of every file in the case directory
+- `chain_of_custody.txt` — append-only, timestamped custody event log
+- `logs.txt` — execution and error log
+
+**Packaged evidence**
+- `export.zip` — the complete, self-contained evidence package
+- `export.zip.sha256` — detached hash of the package
+
+All outputs are stored in the application's external files directory. They can be extracted with `adb pull`, or shared directly from the app via a `FileProvider`.
 
 ---
 
@@ -64,29 +78,57 @@ All outputs are stored in the application’s external files directory and can b
 The application follows key digital forensic principles:
 
 - Logical acquisition using **read-only APIs**
-- No rooting, exploitation, or security bypass
+- **No rooting, exploitation, or security bypass**
 - Explicit permission handling and documentation
-- Cryptographic hashing for integrity verification
+- Cryptographic hashing (SHA-256) for integrity verification
+- **Chain of custody** recorded as an append-only event log, written *before* packaging so it is included in the sealed archive
 - Clear separation between data sources and outputs
 - Reproducible test cases using synthetic data
+
+### Integrity verification
+
+The manifest deliberately describes the *inputs* only: `manifest.json`, `hashes.sha256`, `export.zip` and `export.zip.sha256` are excluded from the file list, so the manifest stays stable as packaging artifacts are produced. To verify an extracted case:
+
+```bash
+sha256sum -c hashes.sha256
+```
 
 ---
 
 ## 🧩 Project Structure
 
 The codebase follows a modular and extensible architecture:
+
 ```
-app/
-├─ ui/ # Main UI
-├─ collectors/ # Artifact-specific collectors
-├─ export/ # Case & file management
-├─ integrity/ # Hashing utilities
-├─ logging/ # Forensic logging
-├─ model/ # Data models
-└─ util/ # Helper utilities
+app/src/main/java/com/gamezorck/forensicasq/
+├─ ui/          # Compose screens (splash, home, case, settings)
+├─ collectors/  # Artifact-specific collectors
+├─ export/      # Case management, manifest, ZIP packaging
+├─ integrity/   # Hashing and provenance
+├─ logging/     # Forensic log and chain of custody
+├─ model/       # Data models
+└─ util/        # Permissions, sharing, time helpers
 ```
 
-Each forensic artifact is handled by an independent collector module, enabling easy extension.
+Each forensic artifact is handled by an independent collector implementing a common `ArtifactCollector` interface, enabling easy extension.
+
+---
+
+## 🚀 Build & Run
+
+```bash
+git clone https://github.com/saragsil/android-forensic-acquisition.git
+cd android-forensic-acquisition
+./gradlew assembleDebug
+```
+
+Then install on a running emulator:
+
+```bash
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+Or open the project in Android Studio and run the `app` configuration. Grant the runtime permissions when prompted — an artifact whose permission is denied is recorded in `manifest.json` as a failed entry carrying the error message, rather than being silently omitted.
 
 ---
 
@@ -94,19 +136,19 @@ Each forensic artifact is handled by an independent collector module, enabling e
 
 Potential future enhancements include:
 
-- Browser history extraction
 - Calendar events acquisition
 - Media metadata analysis
 - Network and Wi-Fi artifacts
-- Automated ZIP export of case data
 - Cross-device testing (real devices vs emulator)
+- Detached signing of the export package
 
 ---
 
 ## ⚠️ Disclaimer
 
-This project is developed **strictly for educational and research purposes**.  
-It is **not intended for use in real investigations** or on devices without proper authorization.
+This project is developed **strictly for educational and research purposes**.
+
+It is **not intended for use in real investigations**, and must not be used on any device without the explicit, documented authorization of its owner. The authors accept no liability for misuse.
 
 ---
 
@@ -118,5 +160,4 @@ GitHub: [saragsil](https://github.com/saragsil)
 
 ## 📜 License
 
-This project is provided for academic use. Licensing can be defined if required.
-
+Licensed under the **Apache License, Version 2.0**. See [LICENSE](LICENSE) for the full text.

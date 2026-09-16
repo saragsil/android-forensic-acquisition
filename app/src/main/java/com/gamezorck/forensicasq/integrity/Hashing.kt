@@ -5,32 +5,45 @@ import java.security.MessageDigest
 
 object Hashing {
 
+    private const val ALGO_SHA256 = "SHA-256"
+    private const val BUFFER_SIZE = 8 * 1024
+
     fun sha256(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
+        val digest = MessageDigest.getInstance(ALGO_SHA256)
         file.inputStream().use { input ->
-            val buffer = ByteArray(8192)
-            var bytes = input.read(buffer)
-            while (bytes > 0) {
-                digest.update(buffer, 0, bytes)
-                bytes = input.read(buffer)
+            val buffer = ByteArray(BUFFER_SIZE)
+            while (true) {
+                val read = input.read(buffer)
+                if (read <= 0) break
+                digest.update(buffer, 0, read)
             }
         }
-        return digest.digest().joinToString("") { "%02x".format(it) }
+        return digest.digest().toHexLower()
     }
 
-    fun writeHashes(caseDir: File) {
-        val out = File(caseDir, "hashes.sha256")
+    /**
+     * Writes hashes for ALL files under caseDir recursively into [outFileName].
+     * Uses relative paths for stability in exports.
+     * Excludes the output file itself to avoid self-referential hashing.
+     */
+    fun writeHashes(caseDir: File, outFileName: String = "hashes.sha256") {
+        val out = File(caseDir, outFileName)
 
-        val lines = StringBuilder()
-        caseDir.listFiles()
-            ?.filter { it.isFile && it.name != out.name }
-            ?.sortedBy { it.name }
-            ?.forEach { f ->
+        val files = caseDir.walkTopDown()
+            .filter { it.isFile }
+            .filterNot { it.name == out.name }
+            .sortedBy { it.relativeTo(caseDir).invariantSeparatorsPath }
+            .toList()
+
+        val text = buildString(capacity = files.size * 80) {
+            for (f in files) {
                 val hash = sha256(f)
-                lines.append("$hash  ${f.name}\n")
+                val relPath = f.relativeTo(caseDir).invariantSeparatorsPath
+                append(hash).append("  ").append(relPath).append('\n')
             }
+        }
 
-        out.writeText(lines.toString())
+        out.writeText(text)
     }
 
     /** Writes "<sha256>  <filename>" to the given output file (overwrites). */
@@ -40,10 +53,17 @@ object Hashing {
         out.writeText("$hash  ${file.name}\n")
     }
 
-    /** Appends "<sha256>  <filename>" to hashes.sha256 (optional helper). */
+    /**
+     * Appends "<sha256>  <filename>" to [outFileName].
+     * Note: keeps "filename only" behavior for backward compatibility.
+     */
     fun appendHashLine(caseDir: File, file: File, outFileName: String = "hashes.sha256") {
         val out = File(caseDir, outFileName)
         val hash = sha256(file)
         out.appendText("$hash  ${file.name}\n")
+    }
+
+    private fun ByteArray.toHexLower(): String = joinToString(separator = "") { b ->
+        ((b.toInt() and 0xff) + 0x100).toString(16).substring(1)
     }
 }

@@ -2,8 +2,12 @@ package com.gamezorck.forensicasq.ui
 
 import androidx.compose.ui.graphics.vector.ImageVector
 
+/**
+ * UI-only model for action / artifact cards.
+ * Does NOT represent domain or forensic results.
+ */
 data class ActionCard(
-    val key: String,
+    val id: String,
     val title: String,
     val subtitle: String,
     val icon: ImageVector,
@@ -11,4 +15,11 @@ data class ActionCard(
     val count: Int? = null
 )
 
-enum class ActionStatus { NotRun, Ok, Error }
+/**
+ * Execution state of a forensic UI action.
+ */
+enum class ActionStatus {
+    NotRun,
+    Ok,
+    Error
+}

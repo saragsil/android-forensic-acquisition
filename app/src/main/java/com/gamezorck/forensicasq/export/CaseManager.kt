@@ -6,17 +6,46 @@ import java.io.File
 
 object CaseManager {
 
+    private const val EXPORTS_DIR = "exports"
+    private const val MAX_CASE_NAME_LEN = 40
+
+    // If you want to disallow digits in case names, set this to false.
+    private const val ALLOW_DIGITS_IN_CASE_NAME = true
+
+    private val INVALID_CHARS_REGEX =
+        if (ALLOW_DIGITS_IN_CASE_NAME) Regex("[^a-zA-Z0-9._-]+")
+        else Regex("[^a-zA-Z._-]+")
+
+    private val MULTI_UNDERSCORE_REGEX = Regex("_+")
+
     private fun exportsRoot(context: Context): File {
-        val root = File(context.getExternalFilesDir(null), "exports")
-        if (!root.exists()) root.mkdirs()
+        val base = context.getExternalFilesDir(null)
+            ?: throw IllegalStateException("External files dir is not available.")
+
+        val root = File(base, EXPORTS_DIR)
+        if (!root.exists() && !root.mkdirs()) {
+            throw IllegalStateException("Failed to create exports directory: ${root.absolutePath}")
+        }
         return root
     }
 
+    /**
+     * Produces a safe folder name:
+     * - trims
+     * - replaces invalid chars with "_"
+     * - collapses multiple underscores
+     * - trims leading/trailing underscores/dots/dashes
+     * - limits length
+     */
     fun sanitizeCaseName(input: String): String {
         val trimmed = input.trim()
-        // safe folder name: letters, numbers, dot, dash, underscore
-        val safe = trimmed.replace(Regex("[^a-zA-Z0-9._-]"), "_")
-        return safe.take(40)
+        if (trimmed.isBlank()) return ""
+
+        val replaced = trimmed.replace(INVALID_CHARS_REGEX, "_")
+        val collapsed = replaced.replace(MULTI_UNDERSCORE_REGEX, "_")
+        val cleanedEdges = collapsed.trim { it == '_' || it == '.' || it == '-' }
+
+        return cleanedEdges.take(MAX_CASE_NAME_LEN)
     }
 
     /** Returns true if a case directory already exists for this name (after sanitize). */
@@ -36,15 +65,11 @@ object CaseManager {
 
         val dir = File(exportsRoot(context), safeName)
         require(!dir.exists()) { "Case name already exists." }
+        if (!dir.mkdirs()) {
+            throw IllegalStateException("Failed to create case directory: ${dir.absolutePath}")
+        }
 
-        dir.mkdirs()
-
-        ChainOfCustody.record(
-            dir,
-            "CASE_CREATED",
-            "caseName=$safeName | path=${dir.absolutePath}"
-        )
-
+        recordCaseEvent(dir, "CASE_CREATED", safeName)
         return dir
     }
 
@@ -59,12 +84,7 @@ object CaseManager {
         val dir = File(exportsRoot(context), safeName)
         require(dir.exists() && dir.isDirectory) { "Case does not exist." }
 
-        ChainOfCustody.record(
-            dir,
-            "CASE_OPENED",
-            "caseName=$safeName | path=${dir.absolutePath}"
-        )
-
+        recordCaseEvent(dir, "CASE_OPENED", safeName)
         return dir
     }
 
@@ -81,24 +101,13 @@ object CaseManager {
         require(safeName.isNotBlank()) { "Case name cannot be blank." }
 
         val dir = File(exportsRoot(context), safeName)
-
         val existedBefore = dir.exists()
-        if (!existedBefore) dir.mkdirs()
 
-        if (!existedBefore) {
-            ChainOfCustody.record(
-                dir,
-                "CASE_CREATED",
-                "caseName=$safeName | path=${dir.absolutePath}"
-            )
-        } else {
-            ChainOfCustody.record(
-                dir,
-                "CASE_OPENED",
-                "caseName=$safeName | path=${dir.absolutePath}"
-            )
+        if (!existedBefore && !dir.mkdirs()) {
+            throw IllegalStateException("Failed to create case directory: ${dir.absolutePath}")
         }
 
+        recordCaseEvent(dir, if (existedBefore) "CASE_OPENED" else "CASE_CREATED", safeName)
         return dir
     }
 
@@ -112,9 +121,16 @@ object CaseManager {
     }
 
     fun deleteCase(caseDir: File): Boolean {
-        val ok = caseDir.deleteRecursively()
-        // Δεν γράφουμε custody εδώ γιατί ο φάκελος διαγράφεται.
-        // Το UI μπορεί να γράφει "CASE_DELETED" πριν το delete, αν θέλετε.
-        return ok
+        // Note: no custody record here because the folder is deleted.
+        // If desired, record "CASE_DELETED" BEFORE calling this.
+        return caseDir.deleteRecursively()
+    }
+
+    private fun recordCaseEvent(caseDir: File, event: String, safeName: String) {
+        ChainOfCustody.record(
+            caseDir,
+            event,
+            "caseName=$safeName | path=${caseDir.absolutePath}"
+        )
     }
 }
