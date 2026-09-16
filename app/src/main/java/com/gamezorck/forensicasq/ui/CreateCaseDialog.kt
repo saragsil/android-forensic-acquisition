@@ -25,15 +25,16 @@ import androidx.compose.material.icons.outlined.Done
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -187,7 +188,7 @@ fun CreateCaseDialog(
                         )
                     )
 
-                    Divider()
+                    HorizontalDivider()
 
                     Text("Optional Information", style = MaterialTheme.typography.titleSmall)
 
@@ -288,7 +289,7 @@ fun CreateCaseDialog(
                                     readOnly = true,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .menuAnchor(),
+                                        .menuAnchor(MenuAnchorType.PrimaryNotEditable),
                                     label = { Text("Organization analysis is being done for") },
                                     leadingIcon = { Icon(Icons.Outlined.Business, contentDescription = null) },
                                     trailingIcon = {

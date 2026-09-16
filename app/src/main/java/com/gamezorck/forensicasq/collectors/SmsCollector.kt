@@ -60,23 +60,20 @@ class SmsCollector : ArtifactCollector {
             val outFile = File(caseDir, OUTPUT_FILE)
             outFile.writeText(out.toString(JSON_INDENT))
 
-            ArtifactResult(
+            ArtifactResult.success(
                 artifact = artifactName,
-                success = true,
                 recordCount = items.length(),
                 outputFile = outFile.name
             )
         } catch (se: SecurityException) {
-            ArtifactResult(
+            ArtifactResult.failure(
                 artifact = artifactName,
-                success = false,
                 error = "SecurityException: ${se.message} (SMS access may be restricted on this Android version/environment)"
             )
         } catch (e: Exception) {
-            ArtifactResult(
+            ArtifactResult.failure(
                 artifact = artifactName,
-                success = false,
-                error = e.message
+                error = e.message ?: e.toString()
             )
         }
     }

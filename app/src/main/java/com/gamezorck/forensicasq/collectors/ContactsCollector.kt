@@ -56,17 +56,15 @@ class ContactsCollector : ArtifactCollector {
             val outFile = File(caseDir, OUTPUT_FILE)
             outFile.writeText(out.toString(JSON_INDENT))
 
-            ArtifactResult(
+            ArtifactResult.success(
                 artifact = artifactName,
-                success = true,
                 recordCount = contacts.length(),
                 outputFile = outFile.name
             )
         } catch (e: Exception) {
-            ArtifactResult(
+            ArtifactResult.failure(
                 artifact = artifactName,
-                success = false,
-                error = e.message
+                error = e.message ?: e.toString()
             )
         }
     }

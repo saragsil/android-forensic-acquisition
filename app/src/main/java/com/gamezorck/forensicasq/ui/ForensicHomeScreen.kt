@@ -22,8 +22,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Apps
-import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Call
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Contacts
@@ -187,7 +187,6 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
     var appsCount by remember { mutableStateOf<Int?>(null) }
 
     suspend fun runCollector(
-        label: String,
         artifactLabel: String,
         collect: suspend () -> ArtifactResult,
         onSuccess: (ArtifactResult) -> Unit,
@@ -217,7 +216,7 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
                         onClick = { clearUiFocus(); onBackToCases() },
                         enabled = !isBusy
                     ) {
-                        Icon(Icons.Outlined.ArrowBack, contentDescription = "Back to Cases")
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back to Cases")
                     }
                 },
                 actions = {
@@ -269,7 +268,6 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
                                     clearUiFocus()
                                     runJob("Collecting device info…") {
                                         runCollector(
-                                            label = "Collecting device info…",
                                             artifactLabel = "DeviceInfo",
                                             collect = { DeviceInfoCollector().collect(context, caseDir) },
                                             onSuccess = { r ->
@@ -297,7 +295,6 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
                                     clearUiFocus()
                                     runJob("Collecting installed apps…") {
                                         runCollector(
-                                            label = "Collecting installed apps…",
                                             artifactLabel = "InstalledApps",
                                             collect = { AppsCollector().collect(context, caseDir) },
                                             onSuccess = { r ->
@@ -336,7 +333,6 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
 
                                     runJob("Collecting contacts…") {
                                         runCollector(
-                                            label = "Collecting contacts…",
                                             artifactLabel = "Contacts",
                                             collect = { ContactsCollector().collect(context, caseDir) },
                                             onSuccess = { r ->
@@ -372,7 +368,6 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
 
                                     runJob("Collecting call logs…") {
                                         runCollector(
-                                            label = "Collecting call logs…",
                                             artifactLabel = "CallLogs",
                                             collect = { CallsCollector().collect(context, caseDir) },
                                             onSuccess = { r ->
@@ -410,7 +405,6 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
 
                             runJob("Collecting SMS…") {
                                 runCollector(
-                                    label = "Collecting SMS…",
                                     artifactLabel = "SMS",
                                     collect = { SmsCollector().collect(context, caseDir) },
                                     onSuccess = { r ->
@@ -463,7 +457,6 @@ fun ForensicHomeScreen(onBackToCases: () -> Unit) {
                     onClick = {
                         clearUiFocus()
                         val zip = File(caseDir, "export.zip")
-                        val sha = File(caseDir, "export.zip.sha256")
 
                         if (!zip.exists()) {
                             logUi("ERROR: export.zip not found. Run Generate Export Pack first.")

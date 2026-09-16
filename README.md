@@ -40,9 +40,8 @@ The application supports the following artifact categories:
 - 💬 **SMS Messages** — `Telephony.Sms` (best-effort, subject to Android restrictions)
 - 📦 **Installed Applications & Permissions** — `PackageManager`
 - 📱 **Device Information** — Android version, model, build fingerprint
-- 🌐 **Browser History** — best-effort, subject to provider availability
 
-> Note: SMS and browser history acquisition are implemented on a best-effort basis. Both are limited by Android security restrictions on newer API levels, where the corresponding content providers are restricted or unavailable to non-default applications.
+> Note: SMS acquisition is implemented on a best-effort basis and is limited by Android security restrictions on newer API levels, where `Telephony.Sms` is restricted or unavailable to applications that are not the default SMS handler.
 
 ---
 
@@ -56,7 +55,6 @@ Each acquisition generates a **case-based export directory** (`CASE-<uuid>/<time
 - `sms.json`
 - `apps.json`
 - `device.json`
-- `browser_history.json`
 
 **Case & integrity metadata**
 - `case_meta.json` — case identity and acquisition parameters
@@ -136,6 +134,11 @@ Or open the project in Android Studio and run the `app` configuration. Grant the
 
 Potential future enhancements include:
 
+- Browser history — a Google Takeout (`BrowserHistory.json`) importer is drafted in
+  `collectors/BrowserHistoryCollector.kt`, but the file is currently commented out in
+  full and is not wired into the UI. Note that it imports an exported archive rather
+  than acquiring history from the device, since browser history providers are not
+  readable by third-party applications.
 - Calendar events acquisition
 - Media metadata analysis
 - Network and Wi-Fi artifacts
